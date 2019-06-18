@@ -24,7 +24,11 @@
 
 package gojsonschema
 
-import "bytes"
+import (
+	"bytes"
+	"fmt"
+	"strings"
+)
 
 // JsonContext implements a persistent linked-list of strings
 type JsonContext struct {
@@ -70,4 +74,43 @@ func (c *JsonContext) writeStringToBuffer(buf *bytes.Buffer, del []string) {
 	}
 
 	buf.WriteString(c.head)
+}
+
+func (c *JsonContext) ReferenceTokens() []string {
+	var output []string
+
+	curr := c
+	for {
+		if curr == nil {
+			break
+		}
+		if curr.tail == nil && curr.head == STRING_CONTEXT_ROOT {
+			// Special case: skip (root)
+		} else {
+			output = append(output, curr.head)
+		}
+		curr = curr.tail
+	}
+
+	// Reverse
+	for i, j := 0, len(output)-1; i < j; i, j = i+1, j-1 {
+		output[i], output[j] = output[j], output[i]
+	}
+
+	return output
+}
+
+func (c *JsonContext) JSONPointer() string {
+	tokens := c.ReferenceTokens()
+	builder := &strings.Builder{}
+	for _, token := range tokens {
+		fmt.Fprintf(builder, "/%s", c.EncodeReferenceToken(token))
+	}
+	return builder.String()
+}
+
+func (c *JsonContext) EncodeReferenceToken(token string) string {
+	token = strings.Replace(token, "~", "~0", -1)
+	token = strings.Replace(token, "/", "~1", -1)
+	return token
 }
